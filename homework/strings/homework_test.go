@@ -1,12 +1,25 @@
 package main
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"unsafe"
 
 	"github.com/stretchr/testify/assert"
 )
+
+/*
+// Предположим, что все будут производить копирование
+// буффера только с использованием метода Clone()
+type COWBuffer struct { ... }
+
+func NewCOWBuffer(data []byte)                         // создать буффер с определенными данными
+func (b *COWBuffer) Clone() COWBuffer                  // создать новую копию буфера
+func (b *COWBuffer) Close()                            // перестать использовать копию буффера
+func (b *COWBuffer) Update(index int, value byte) bool // изменить определенный байт в буффере
+func (b *COWBuffer) String() string                    // сконвертировать буффер в строку
+*/
 
 type COWBuffer struct {
 	data []byte
@@ -15,23 +28,68 @@ type COWBuffer struct {
 }
 
 func NewCOWBuffer(data []byte) COWBuffer {
-	return COWBuffer{} // need to implement
+	// copiedData := make([]byte, len(data))
+	// copy(copiedData, data)
+	refCount := 1
+	return COWBuffer{
+		data: unsafe.Slice(unsafe.SliceData(data), len(data)),
+		refs: &refCount,
+	}
 }
 
 func (b *COWBuffer) Clone() COWBuffer {
-	return COWBuffer{} // need to implement
+	if b.data == nil {
+		return COWBuffer{}
+	}
+
+	*b.refs++
+
+	return *b
 }
 
 func (b *COWBuffer) Close() {
-	// need to implement
+	if b.data == nil && b.refs == nil {
+		return
+	}
+
+	*b.refs--
+
+	if *b.refs == 0 {
+		b.data = nil
+		b.refs = nil
+	}
 }
 
 func (b *COWBuffer) Update(index int, value byte) bool {
-	return false // need to implement
+	if b.data == nil || b.refs == nil {
+		return false
+	}
+
+	if index < 0 || index >= len(b.data) {
+		return false
+	}
+
+	if *b.refs > 1 {
+		newData := make([]byte, len(b.data))
+		copy(newData, b.data)
+		*b.refs--
+
+		newRefCount := 1
+		b.data = newData
+		b.refs = &newRefCount
+	}
+
+	b.data[index] = value
+	return true
 }
 
 func (b *COWBuffer) String() string {
-	return "" // need to implement
+	if b.data == nil {
+		return ""
+	}
+
+	// Преобразуем байты в строку
+	return unsafe.String(unsafe.SliceData(b.data), len(b.data))
 }
 
 func TestCOWBuffer(t *testing.T) {
@@ -45,6 +103,9 @@ func TestCOWBuffer(t *testing.T) {
 	assert.Equal(t, unsafe.SliceData(data), unsafe.SliceData(buffer.data))
 	assert.Equal(t, unsafe.SliceData(buffer.data), unsafe.SliceData(copy1.data))
 	assert.Equal(t, unsafe.SliceData(copy1.data), unsafe.SliceData(copy2.data))
+
+	fmt.Println((*byte)(unsafe.SliceData(data)))
+	fmt.Println(unsafe.StringData(buffer.String()))
 
 	assert.True(t, (*byte)(unsafe.SliceData(data)) == unsafe.StringData(buffer.String()))
 	assert.True(t, (*byte)(unsafe.StringData(buffer.String())) == unsafe.StringData(copy1.String()))
