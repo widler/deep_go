@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"unsafe"
@@ -8,35 +9,63 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func ReplaceBits(pos int, count int, value bool) uint32 {
+	var clearMask uint32 = ((1 << count) - 1) << pos
+	// if value {
+	// 	clearMask = 0
+	// }
+	result := math.MaxUint32 & ^clearMask
+	fmt.Printf("mask: %32b\n", clearMask)
+	if value {
+		var setMask uint32 = ((1 << count) - 1) << pos
+		fmt.Printf("set mask: %32b\n", clearMask)
+		result |= setMask
+	}
+	return result
+}
+
 type Option func(*GamePerson)
 
 func WithName(name string) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		name = name[:42]
+		dataNamePtr := (*[42]byte)(unsafe.Pointer(&person.name))
+		for i := 0; i < len(name); i++ {
+			dataNamePtr[i] = name[i]
+		}
 	}
 }
 
 func WithCoordinates(x, y, z int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		person.x = int32(x)
+		person.y = int32(y)
+		person.z = int32(z)
 	}
 }
 
 func WithGold(gold int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		person.goldhome &= 1
+		person.goldhome |= uint32(gold << 1)
 	}
 }
 
 func WithMana(mana int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		mask := ReplaceBits(22, 10, false)
+		fmt.Printf("%32b\n", mask)
+		person.flags &= mask
+		person.flags |= uint32(mana << 22)
 	}
 }
 
 func WithHealth(health int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		mask := ReplaceBits(12, 10, false)
+		fmt.Printf("%32b\n", mask)
+		person.flags &= mask
+		person.flags |= uint32(health << 12)
 	}
 }
 
@@ -66,7 +95,9 @@ func WithLevel(level int) func(*GamePerson) {
 
 func WithHouse() func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		mask := math.MaxUint32 - 1
+		person.goldhome &= uint32(mask)
+		person.goldhome |= uint32(1)
 	}
 }
 
@@ -95,47 +126,58 @@ const (
 )
 
 type GamePerson struct {
+	name     [42]byte
+	ptype    int8
+	x, y, z  int32
+	goldhome uint32
+	flags    uint32
 	// need to implement
 }
 
 func NewGamePerson(options ...Option) GamePerson {
-	// need to implement
-	return GamePerson{}
+	person := GamePerson{}
+	for _, option := range options {
+		option(&person)
+	}
+	return person
 }
 
 func (p *GamePerson) Name() string {
-	// need to implement
-	return ""
+	if p == nil {
+		return ""
+	}
+	return unsafe.String(&p.name[0], 42)
 }
 
 func (p *GamePerson) X() int {
 	// need to implement
-	return 0
+	return int(p.x)
 }
 
 func (p *GamePerson) Y() int {
 	// need to implement
-	return 0
+	return int(p.y)
 }
 
 func (p *GamePerson) Z() int {
 	// need to implement
-	return 0
+	return int(p.z)
 }
 
 func (p *GamePerson) Gold() int {
-	// need to implement
-	return 0
+
+	return int(p.goldhome >> 1)
 }
 
 func (p *GamePerson) Mana() int {
 	// need to implement
-	return 0
+	return int(p.flags >> 22)
 }
 
 func (p *GamePerson) Health() int {
-	// need to implement
-	return 0
+	mask := uint32((1<<10 - 1) << 12)
+	fmt.Printf("%32b\n", mask)
+	return int((p.flags & mask) >> 12)
 }
 
 func (p *GamePerson) Respect() int {
@@ -159,8 +201,8 @@ func (p *GamePerson) Level() int {
 }
 
 func (p *GamePerson) HasHouse() bool {
-	// need to implement
-	return false
+	mask := uint32(1)
+	return (p.goldhome & mask) == 1
 }
 
 func (p *GamePerson) HasGun() bool {
@@ -179,6 +221,7 @@ func (p *GamePerson) Type() int {
 }
 
 func TestGamePerson(t *testing.T) {
+	fmt.Println(unsafe.Sizeof(GamePerson{}))
 	assert.LessOrEqual(t, unsafe.Sizeof(GamePerson{}), uintptr(64))
 
 	const x, y, z = math.MinInt32, math.MaxInt32, 0
