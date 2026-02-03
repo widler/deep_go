@@ -11,14 +11,9 @@ import (
 
 func ReplaceBits(pos int, count int, value bool) uint32 {
 	var clearMask uint32 = ((1 << count) - 1) << pos
-	// if value {
-	// 	clearMask = 0
-	// }
 	result := math.MaxUint32 & ^clearMask
-	fmt.Printf("mask: %32b\n", clearMask)
 	if value {
 		var setMask uint32 = ((1 << count) - 1) << pos
-		fmt.Printf("set mask: %32b\n", clearMask)
 		result |= setMask
 	}
 	return result
@@ -54,7 +49,6 @@ func WithGold(gold int) func(*GamePerson) {
 func WithMana(mana int) func(*GamePerson) {
 	return func(person *GamePerson) {
 		mask := ReplaceBits(22, 10, false)
-		fmt.Printf("%32b\n", mask)
 		person.flags &= mask
 		person.flags |= uint32(mana << 22)
 	}
@@ -63,7 +57,6 @@ func WithMana(mana int) func(*GamePerson) {
 func WithHealth(health int) func(*GamePerson) {
 	return func(person *GamePerson) {
 		mask := ReplaceBits(12, 10, false)
-		fmt.Printf("%32b\n", mask)
 		person.flags &= mask
 		person.flags |= uint32(health << 12)
 	}
@@ -71,25 +64,34 @@ func WithHealth(health int) func(*GamePerson) {
 
 func WithRespect(respect int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		mask := ReplaceBits(8, 4, false)
+		person.flags &= mask
+		person.flags |= uint32(respect << 8)
 	}
 }
 
 func WithStrength(strength int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		mask := ReplaceBits(4, 4, false)
+		person.flags &= mask
+		person.flags |= uint32(strength << 4)
 	}
 }
 
 func WithExperience(experience int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		mask := ReplaceBits(4, 0, false)
+		person.flags &= mask
+		person.flags |= uint32(experience)
 	}
 }
 
 func WithLevel(level int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		var mask uint8 = ((1 << 4) - 1) << 4
+		clearMask := math.MaxUint8 & ^mask
+		person.flags2 &= clearMask
+		person.flags2 |= uint8(level << 4)
 	}
 }
 
@@ -103,19 +105,24 @@ func WithHouse() func(*GamePerson) {
 
 func WithGun() func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		mask := uint8(1 << 3)
+		person.flags2 |= mask
 	}
 }
 
 func WithFamily() func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		mask := uint8(1 << 2)
+		person.flags2 |= mask
 	}
 }
 
 func WithType(personType int) func(*GamePerson) {
 	return func(person *GamePerson) {
-		// need to implement
+		var mask uint8 = 3
+		clearMask := math.MaxUint8 & ^mask
+		person.flags2 &= clearMask
+		person.flags2 |= uint8(personType)
 	}
 }
 
@@ -127,7 +134,7 @@ const (
 
 type GamePerson struct {
 	name     [42]byte
-	ptype    int8
+	flags2   uint8
 	x, y, z  int32
 	goldhome uint32
 	flags    uint32
@@ -176,28 +183,26 @@ func (p *GamePerson) Mana() int {
 
 func (p *GamePerson) Health() int {
 	mask := uint32((1<<10 - 1) << 12)
-	fmt.Printf("%32b\n", mask)
 	return int((p.flags & mask) >> 12)
 }
 
 func (p *GamePerson) Respect() int {
-	// need to implement
-	return 0
+	mask := uint32((1<<4 - 1) << 8)
+	return int((p.flags & mask) >> 8)
 }
 
 func (p *GamePerson) Strength() int {
-	// need to implement
-	return 0
+	mask := uint32((1<<4 - 1) << 4)
+	return int((p.flags & mask) >> 4)
 }
 
 func (p *GamePerson) Experience() int {
-	// need to implement
-	return 0
+	mask := uint32((1<<4 - 1))
+	return int((p.flags & mask))
 }
 
 func (p *GamePerson) Level() int {
-	// need to implement
-	return 0
+	return int(p.flags2 >> 4)
 }
 
 func (p *GamePerson) HasHouse() bool {
@@ -206,18 +211,18 @@ func (p *GamePerson) HasHouse() bool {
 }
 
 func (p *GamePerson) HasGun() bool {
-	// need to implement
-	return false
+	mask := uint8(1 << 3)
+	return (p.flags2&mask)>>3 == 1
 }
 
 func (p *GamePerson) HasFamilty() bool {
-	// need to implement
-	return false
+	mask := uint8(1 << 2)
+	return (p.flags2&mask)>>2 == 1
 }
 
 func (p *GamePerson) Type() int {
-	// need to implement
-	return 0
+	var mask uint8 = 3
+	return int(p.flags2 & mask)
 }
 
 func TestGamePerson(t *testing.T) {
@@ -226,7 +231,7 @@ func TestGamePerson(t *testing.T) {
 
 	const x, y, z = math.MinInt32, math.MaxInt32, 0
 	const name = "aaaaaaaaaaaaa_bbbbbbbbbbbbb_cccccccccccccc"
-	const personType = BuilderGamePersonType
+	const personType = WarriorGamePersonType
 	const gold = math.MaxInt32
 	const mana = 1000
 	const health = 1000
