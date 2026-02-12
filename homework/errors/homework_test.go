@@ -11,12 +11,11 @@ import (
 // go test -v homework_test.go
 
 type MultiError struct {
-	// need to implement
 	errs []error
 }
 
-func (me *MultiError) Append(err error) {
-	me.errs = append(me.errs, err)
+func (me *MultiError) Append(errs ...error) {
+	me.errs = append(me.errs, errs...)
 }
 
 func (e *MultiError) Error() string {
@@ -34,18 +33,14 @@ func (e *MultiError) Error() string {
 func Append(err error, errs ...error) *MultiError {
 	switch err := err.(type) {
 	case *MultiError:
-		for _, item := range errs {
-			err.Append(item)
-		}
+		err.Append(errs...)
 		return err
 	default:
 		res := &MultiError{}
 		if err != nil {
 			res.Append(err)
 		}
-		for _, item := range errs {
-			res.Append(item)
-		}
+		res.Append(errs...)
 		return res
 	}
 }
